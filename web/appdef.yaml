@@ -1,0 +1,14 @@
+spec_version: 1
+name: appdef-service
+apps:
+  main:
+    description: |-
+      The single appdef-service container.
+      Serves the ui and handles api calls.
+    image: appdef-service
+    build: ./
+    path: /
+    port: 5000
+    user: 1066
+    read_only: true
+

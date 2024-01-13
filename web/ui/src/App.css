@@ -1,0 +1,41 @@
+
+.fullscreen {
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 2rem;
+}
+
+footer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2rem;
+  text-align: center;
+}
+
+@media print {
+
+	* {
+		font-size: 10pt;
+	}
+
+	.rad-logo {
+		fill: black;
+	}
+
+	footer {
+		display: none;
+	}
+
+	.print-hide {
+		display: none;
+	}
+
+	/*
+	 * Bootstrap tabs should be hidden in print
+	 */
+	.nav-tabs {
+		display: none;
+	}
+}
