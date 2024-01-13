@@ -1,0 +1,200 @@
+{{/*
+ * Copyright (C) Byron Murgatroyd - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Byron Murgatroyd <byron.murgatroyd@appdef.io>, 2022
+*/}}
+
+name: {{ $.Spec.Name }} GKE
+on:
+  push:
+    branches:
+      - 'dev/**'
+  delete:
+    branches:
+      - 'dev/**'
+
+env:
+  PROJECT_ID: {{ printf "${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix }}
+  # This tells terraform where the kubeconfig is. The location is irrelevant
+  KUBE_CONFIG_PATH: "/tmp/kubeconfig.yml"
+  # This sets several internal terraform switches
+  TF_IN_AUTOMATION: "true"
+  # These are the variables that terraform will need
+  TF_VAR_LIVE_TAG: {{` ${{ github.sha }} `}} 
+  TF_VAR_HA: "false"
+  TF_VAR_DEV_MODE: "true"
+  TF_VAR_INTERNAL_IMAGE_REPO: {{ printf "eu.gcr.io/${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix | quote }}
+  TF_VAR_INGRESS_AUTH_REQUEST: {{ printf "oauth.${{ secrets.%sBASE_DOMAIN }}" $.TemplateVars.SecretPrefix | quote }}
+  {{- if eq $.Spec.SecretSource "gcp" }}
+  TF_VAR_GCP_SECRET_MANAGER_PROJECT: {{ printf "${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix }}
+  {{- end }}
+
+jobs:
+  "load_spec":
+    name: Load spec
+    runs-on: ubuntu-latest
+    outputs:
+      spec-apps: {{`${{ steps.setout.outputs.spec-apps }}`}}
+    steps:
+      # Checkout the repo
+      - uses: actions/checkout@v3
+      # Convert the spec
+      - uses: fabasoad/yaml-json-xml-converter-action@main
+        id: yaml2json
+        with:
+          path: 'appdef.yaml'
+          from: 'yaml'
+          to: 'json'
+      # Extract containers from the json spec and set to the spec-apps output
+      - name: Set ouptut
+        id: setout
+        shell: bash
+        # This runner extracts all components with a build key but no tag key
+        run: |
+          echo ::set-output name=spec-apps::$(jq '.["apps"?, "cron"?, "startup"?] | .[] | select("build") | select(has("tag")|not)' <<< '{{`${{ steps.yaml2json.outputs.data}}`}}' | jq -cs)
+        # Output is non-sensitive so we can output it for debugging
+      - name: inspect output
+        run: echo '{{`${{ steps.setout.outputs.spec-apps }}`}}'
+
+  "build":
+    runs-on: ubuntu-20.04
+    if: github.event_name == 'push'
+    needs: load_spec
+    # This job runs for each container in the spec
+    strategy:
+      matrix:
+        apps: {{`${{ fromJson(needs.load_spec.outputs.spec-apps) }}`}}
+    steps:
+      # Checkout the code
+      - name: checkout
+        uses: actions/checkout@v3
+
+      {{- if eq $.Spec.SecretSource "gcp" }}
+      # Setup the gcloud scripts to load secrets from gcp
+      - name: GCP setup
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: {{ printf "${{ secrets.%sCI_GCP_TOKEN }}" $.TemplateVars.SecretPrefix }}
+          project_id: {{ printf "${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix }}
+          create_credentials_file: true
+
+      {{- end }}{{/* end secret source gcp */}}
+
+      # Have gcloud authenticate to GCR
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      # Build each image
+      - name: build
+        run: docker build -t eu.gcr.io/$PROJECT_ID/{{ `${{matrix.apps.image}}` }}:$GITHUB_SHA {{ `${{matrix.apps.build}}` }}
+
+      # Push it to our repo
+      - name: push
+        run: docker push eu.gcr.io/$PROJECT_ID/{{ `${{matrix.apps.image}}` }}:$GITHUB_SHA
+
+  "deploy":
+    runs-on: ubuntu-20.04
+    needs: "build"
+    if: github.event_name == 'push'
+    steps:
+      # Checkout the repo
+      - name: checkout
+        uses: actions/checkout@v3
+
+      {{- if eq $.Spec.SecretSource "gcp" }}
+      # Setup the gcloud scripts to load secrets from gcp
+      - name: GCP setup
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: {{ printf "${{ secrets.%sCI_GCP_TOKEN }}" $.TemplateVars.SecretPrefix }}
+          project_id: {{ printf "${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix }}
+          create_credentials_file: true
+
+      {{- end }}{{/* end secret source gcp */}}
+
+      # Install terraform binary
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      # Deduce the target workspace from the branch name
+      - name: Set vars
+        id: vars
+        run: echo ::set-output name=env_name::${GITHUB_REF##*/}
+
+      # Write out our KUBECONFIG.
+      - name: Write Kubeconfig
+        run: 'echo "$KUBECONFIG" > $KUBE_CONFIG_PATH'
+        shell: bash
+        env:
+          KUBECONFIG: {{ printf "${{ secrets.%sKUBECONFIG }}" $.TemplateVars.SecretPrefix }}
+
+      # Initialize terraform
+      - name: Init
+        run: terraform init
+
+      # Select the workspace
+      - name: Workspace
+        run: terraform workspace select {{`${{ steps.vars.outputs.env_name }}`}} || terraform workspace new {{`${{ steps.vars.outputs.env_name }}`}}
+
+      # Run apply
+      - name: Apply
+        env:
+          # We have to set the BASE_DOMAIN here as it uses the branch step
+          TF_VAR_BASE_DOMAIN: {{ printf "${{ steps.vars.outputs.env_name }}.${{ secrets.%sBASE_DOMAIN }}" $.TemplateVars.SecretPrefix | quote }}
+        run: |
+          terraform apply -auto-approve -no-color -input=false
+
+  "delete":
+    runs-on: ubuntu-20.04
+    # Only run when a branch is deleted
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    steps:
+      {{- if eq $.Spec.SecretSource "gcp" }}
+      # Setup the gcloud scripts to load secrets from gcp
+      - name: GCP setup
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: {{ printf "${{ secrets.%sCI_GCP_TOKEN }}" $.TemplateVars.SecretPrefix }}
+          project_id: {{ printf "${{ secrets.%sGCP_PROJECT_ID }}" $.TemplateVars.SecretPrefix }}
+          create_credentials_file: true
+
+      {{- end }}{{/* end secret source gcp */}}
+
+      # Install terraform binary
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      # Deduce the target workspace from the branch name
+      - name: Set vars
+        id: vars
+        env:
+          BRANCH_NAME: {{`${{ github.event.ref }}`}}
+        run: echo ::set-output name=env_name::${BRANCH_NAME##*/}
+
+      # Checkout the repo
+      - name: checkout
+        uses: actions/checkout@v3
+
+      # Write out our KUBECONFIG.
+      - name: Write Kubeconfig
+        run: 'echo "$KUBECONFIG" > $KUBE_CONFIG_PATH'
+        shell: bash
+        env:
+          KUBECONFIG: {{ printf "${{ secrets.%sKUBECONFIG }}" $.TemplateVars.SecretPrefix }}
+
+      # Initialize terraform
+      - name: Init
+        run: terraform init
+
+      # Select the workspace
+      - name: Workspace
+        run: terraform workspace select {{`${{ steps.vars.outputs.env_name }}`}}
+
+      # Run delete.
+      - name: Delete
+        env:
+          # Delete just needs to know what the base domain would have been.
+          TF_VAR_BASE_DOMAIN: {{ printf "${{ steps.vars.outputs.env_name }}.${{ secrets.%sBASE_DOMAIN }}" $.TemplateVars.SecretPrefix | quote }}
+        run: |
+          terraform destroy -auto-approve -no-color -input=false

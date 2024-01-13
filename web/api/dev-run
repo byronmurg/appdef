@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+# This is just a handy script to reload the api when any chages occur
+# to either the code or the templates.
+
+nodemon --ext "go,tf,conf,yml,yaml" --signal SIGTERM --exec "go run main.go || exit 1"
