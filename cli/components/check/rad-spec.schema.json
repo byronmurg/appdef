@@ -1,0 +1,381 @@
+{
+	"id":"https://appdef.io/appdef.schema.json",
+	"title":"appdef",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["spec_version", "name"],
+	"properties": {
+		"name": { "type":"string", "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" },
+		"spec_version": { "type":"number", "const":1 },
+		"apps": {
+			"type": "object",
+			"propertyNames": { "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" },
+			"additionalProperties": {
+				"type":"object",
+				"title":"app",
+				"additionalProperties": false,
+				"required": ["image", "description"],
+				"oneOf": [
+					{ "required":["build"] },
+					{ "required":["tag"] }
+				],
+				"properties": {
+					"description": { "type":"string", "minLength":3, "maxLength":256 },
+
+					"image": { "type":"string", "pattern": "^(\\.|\\d|_|-|\\w|/){1,32}$" },
+					"tag": { "type":"string", "pattern": "^(\\.|\\d|-|\\w){1,32}$" },
+					"build": { "type":"string" },
+
+					"path": { "type":"string", "pattern":"^/(/|\\w|-|_|\\d){0,16}$" },
+					"subdomain": { "type":"string", "pattern":"^(\\w|-){1,16}$" },
+
+					"user": { "type":"number", "minimum":1000, "maximum":65536 },
+					"read_only": { "type":"boolean", "default":false },
+
+					"secrets": {
+						"type": "array",
+						"maxItems": 64,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["var", "description"],
+							"properties": {
+								"var": { "type":"string", "pattern":"^[A-Z,_]{1,32}$" },
+								"description": { "type":"string", "maxLength":256 }
+							}
+						}
+					},
+
+					"health_check": { "type":"string", "pattern":"^/(/|\\w|-|_|\\d){0,16}$" },
+					"external": {
+						"type": "array",
+						"maxItems": 16,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["name"],
+							"properties": {
+								"name": { "type":"string", "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" }
+							}
+						}
+					},
+					"mongo": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"postgresql": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"s3": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"port": { "type":"number", "minimum": 0 }
+				}
+			},
+			"maxItems": 8,
+			"minItems": 1
+		},
+		"cron": {
+			"type": "object",
+			"propertyNames": { "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" },
+			"additionalProperties": {
+				"type":"object",
+				"title":"cron",
+				"additionalProperties": false,
+				"required": ["image", "schedule", "description"],
+				"oneOf": [
+					{ "required":["build"] },
+					{ "required":["tag"] }
+				],
+				"properties": {
+					"description": { "type":"string", "minLength":3, "maxLength":256 },
+					"schedule": { "type":"string" },
+
+					"image": { "type":"string", "pattern": "^(\\.|\\d|_|-|\\w|/){1,32}$" },
+					"tag": { "type":"string", "pattern": "^(\\.|\\d|-|\\w){1,32}$" },
+					"build": { "type":"string" },
+					"user": { "type":"number", "minimum":1000, "maximum":65536 },
+					"read_only": { "type":"boolean", "default":false },
+
+					"secrets": {
+						"type": "array",
+						"maxItems": 64,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["var", "description"],
+							"properties": {
+								"var": { "type":"string", "pattern":"^[A-Z,_]{1,32}$" },
+								"description": { "type":"string", "maxLength":256 }
+							}
+						}
+					},
+
+					"external": {
+						"type": "array",
+						"maxItems": 16,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["name"],
+							"properties": {
+								"name": { "type":"string", "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" }
+							}
+						}
+					},
+
+					"mongo": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"priviledged": { "type":"boolean", "default":false },
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"postgresql": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"priviledged": { "type":"boolean", "default":false },
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"s3": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					}
+				}
+			},
+			"maxItems": 8,
+			"minItems": 1
+		},
+		"startup": {
+			"type": "object",
+			"propertyNames": { "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" },
+			"additionalProperties": {
+				"type":"object",
+				"title":"cron",
+				"additionalProperties": false,
+				"required": ["image", "description"],
+				"oneOf": [
+					{ "required":["build"] },
+					{ "required":["tag"] }
+				],
+				"properties": {
+					"description": { "type":"string", "minLength":3, "maxLength":256 },
+
+					"image": { "type":"string", "pattern": "^(\\.|\\d|_|-|\\w|/){1,32}$" },
+					"tag": { "type":"string", "pattern": "^(\\.|\\d|-|\\w){1,32}$" },
+					"build": { "type":"string" },
+					"user": { "type":"number", "minimum":1000, "maximum":65536 },
+					"read_only": { "type":"boolean", "default":false },
+
+					"secrets": {
+						"type": "array",
+						"maxItems": 64,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["var", "description"],
+							"properties": {
+								"var": { "type":"string", "pattern":"^[A-Z,_]{1,32}$" },
+								"description": { "type":"string", "maxLength":256 }
+							}
+						}
+					},
+
+					"external": {
+						"type": "array",
+						"maxItems": 16,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["name"],
+							"properties": {
+								"name": { "type":"string", "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" }
+							}
+						}
+					},
+
+					"mongo": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"priviledged": { "type":"boolean", "default":false },
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"postgresql": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"priviledged": { "type":"boolean", "default":false },
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					},
+					"s3": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["db"],
+						"properties": {
+							"use": { "type":"boolean", "default": false },
+							"db": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					}
+				}
+			},
+			"maxItems": 8,
+			"minItems": 1
+		},
+		"mongo": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled", "dbs"],
+			"properties": {
+				"enabled": { "type":"boolean", "default":false },
+				"dbs": {
+					"type":"array",
+					"minItems": 1,
+					"maxItems": 16,
+					"items": {
+						"type":"object",
+						"additionalProperties":false,
+						"required": ["name"],
+						"properties": {
+							"name": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					}
+				}
+			}
+		},
+		"postgresql": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled", "dbs"],
+			"properties": {
+				"enabled": { "type":"boolean", "default":false },
+				"dbs": {
+					"type":"array",
+					"minItems": 1,
+					"maxItems": 16,
+					"items": {
+						"type":"object",
+						"additionalProperties":false,
+						"required": ["name"],
+						"properties": {
+							"name": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					}
+				}
+			}
+		},
+		"s3": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled", "dbs"],
+			"properties": {
+				"enabled": { "type":"boolean", "default":false },
+				"dbs": {
+					"type":"array",
+					"minItems": 1,
+					"maxItems": 16,
+					"items": {
+						"type":"object",
+						"additionalProperties":false,
+						"required": ["name"],
+						"properties": {
+							"name": {
+								"type": "string",
+								"pattern": "^\\w{1,16}$"
+							}
+						}
+					}
+				}
+			}
+		},
+
+
+		"external": {
+			"type": "object",
+			"maxItems": 16,
+			"propertyNames": { "pattern":"^[A-Z,a-z,\\-,\\d]{2,16}$" },
+			"additionalProperties": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["hostname", "ports"],
+				"properties": {
+					"hostname": { "type":"string", "format":"idn-hostname" },
+					"ports": { "type":"array", "items": { "type":"number", "minimum":0, "maximum":65536 }, "maxItems":16 }
+				}
+			}
+		},
+
+		"secret_source": {
+			"type": "string",
+			"enum": ["", "none", "doppler", "gcp"]
+		}
+	}
+}

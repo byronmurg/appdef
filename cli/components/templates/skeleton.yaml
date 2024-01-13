@@ -1,0 +1,81 @@
+{{/*
+ * Copyright (C) Byron Murgatroyd - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Byron Murgatroyd <byron.murgatroyd@appdef.io>, 2022
+*/}}
+spec_version: "0.7.0"
+name: "{{ .name }}"
+
+# This is where we define the services *that we create*
+apps:
+  "ui":
+    path: "/"    # This is where the app is mounted in the routing table
+    image: "{{ .name }}-ui"    # Docker image (without repository)
+    build: ui/    # The path to this app's docker file
+
+  "api":
+    path: "/api"
+    build: api/
+    image: "{{ .name }}-api"
+
+    # Our app responds to GET /health with 200 when it is healthy
+    #health_check: "/health"
+
+    # Our app uses the external resource bbc
+    #external:
+    #- name: bbc
+
+    # Our app uses the mongo db "products"
+    #mongo:
+    #  use: true
+    #  db: products
+
+    # Our app uses the postgresql db "users"
+    #postgresql:
+    #  use: true
+    #  db: users
+
+    # Our app uses the minio bucket "images"
+    #s3:
+    #  use: true
+    #  db: images
+
+#cron:
+#  "cleanup-db":
+#    schedule: "00 01 * * *"
+#    image: {{ .name }}-cleanup-db
+#    build: cleanup-db/
+#    mongo:
+#      use: true
+#      db: data
+
+#startup:
+#  "init-db":
+#    image: {{ .name }}-init-db
+#    tag: 1.0.0
+#    build: init-db/
+#    mongo:
+#      use: true
+#      db: data
+
+#mongo:
+#  enabled: true
+#  dbs:
+#  - data
+
+#postgresql:
+#  enabled: true
+#  dbs:
+#  - data
+
+#s3:
+#  enabled: true
+#  dbs:
+#  - data
+
+# We can define external hosts to allow network traffic to
+#external:
+#  "bbc":
+#    hostname: "www.bbc.co.uk"
+#    ports: [443, 80]
