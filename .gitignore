@@ -2,4 +2,6 @@ web/ui/node_modules
 web/ui/build
 test_app/api/node_modules
 cli/appdef
+cli/release
+cli/build
 test_app/.terraform*
