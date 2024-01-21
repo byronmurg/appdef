@@ -1,0 +1,23 @@
+spec_version: 1
+name: noddy
+apps:
+  ui:
+    description: The noddy ui yoyo
+    image: noddy-ui
+    build: ui/
+    path: /
+    port: 8080
+  api:
+    description: A simple api
+    image: noddy-api
+    build: api/
+    path: /api
+    port: 8080
+    read_only: true
+    postgresql:
+      use: true
+      db: app
+postgresql:
+  enabled: true
+  dbs:
+    - name: app
