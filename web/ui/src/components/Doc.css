@@ -1,0 +1,17 @@
+
+.doc-section {
+	margin-bottom: 1rem;
+}
+
+.doc-section-body {
+	margin-left: 1rem;
+	margin-right: 1rem;
+}
+
+.doc-section-body h3 {
+	font-size: 120%;
+}
+
+.doc-section-body .doc-section-body h3 {
+	font-size: 80%;
+}

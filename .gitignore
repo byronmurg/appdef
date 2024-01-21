@@ -1,0 +1,5 @@
+web/ui/node_modules
+web/ui/build
+test_app/api/node_modules
+cli/appdef
+test_app/.terraform*

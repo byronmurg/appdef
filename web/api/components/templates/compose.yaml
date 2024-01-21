@@ -1,0 +1,255 @@
+{{/*
+ * Copyright (C) Byron Murgatroyd - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Byron Murgatroyd <byron.murgatroyd@appdef.io>, 2022
+*/}}
+version: "3.3"
+services:
+  __router:
+    image: nginx:latest
+    restart: on-failure
+    ports:
+    - "{{ $.Config.LocalPort }}:80"
+    secrets:
+    - source: router_config
+      target: /etc/nginx/nginx.conf
+    networks:
+    - app_net
+
+{{ range $k, $app := .Spec.Apps }}
+  {{- if not (index $.Expose $k) }}
+  {{$k}}:
+    {{- if $app.Tag }}
+    image: {{ $app.Image }}:{{ $app.Tag }}
+    {{- else }}
+    build: {{ $.Cwd}}/{{ $.AppRoot }}/{{ $app.Build }}
+    {{- end }}
+
+    {{- if or $app.Mongo.Use $app.Postgresql.Use $app.S3.Use }}
+    depends_on:
+    {{ if $app.Mongo.Use }} - __db-mongo {{ end }}
+    {{ if $app.Postgresql.Use }} - __db-postgresql {{ end }}
+    {{ if $app.S3.Use }} - __db-minio {{ end }}
+    {{- end }}
+
+    ## {{ toJson $app }}
+    {{- if $app.ReadOnly }}
+    read_only: true
+    {{- end}}
+    {{- with $app.User }}
+    user: {{.}}
+    {{- end}}
+
+    restart: on-failure
+    environment:
+      EXT_ROUTE_MAP: '{{ $.UrlMapJson }}'
+      NODE_ENV: "development"
+
+      {{- range $app.Secrets }}
+      {{ .Var }}: # {{ .Description }}
+      {{- end }}
+
+    {{- with $app.Port }}
+      PORT: {{.}}
+    {{- else }}
+      PORT: 8080
+    {{- end }}
+
+    {{- with $app.Path }}
+      MOUNT_PATH: "{{ $app.Path }}"
+      APP_URL: "{{ index $.UrlMap $k }}"
+    {{- end }}
+
+    {{- with $app.Mongo }}
+    {{- if .Use }}
+      MONGO_CONNECTION_STRING: "mongodb://__db-mongo/{{.Db}}"
+    {{- end }}
+    {{- end }}
+
+    {{- with $app.Postgresql }}
+    {{- if .Use }}
+      PGUSERNAME: "{{$k}}"
+      PGUSER: "{{$k}}"
+      PGPASSWORD: "{{$k}}"
+      PGPORT: 5432
+      PGDATABASE: "{{.Db}}"
+      PGHOST: __db-postgresql
+    {{- end }}
+    {{- end }}
+
+    {{- with $app.S3 }}
+    {{- if .Use }}
+      S3_ACCESS_KEY: "s3-bucket-access-user"
+      S3_SECRET_KEY: "s3-bucket-access-password"
+      S3_ENDPOINT: "__db-minio"
+      S3_BUCKET: "{{.Db}}"
+    {{- end }}
+    {{- end }}
+
+    {{- if $.Expose.Enabled }}
+    extra_hosts:
+    - "{{$.Expose.App}}:172.17.0.1"
+    {{- end }}
+
+    networks:
+    - app_net  
+  {{- end }}
+{{ end }}
+
+{{ range $k, $start := .Spec.Startup }}
+  _startup_{{$k}}:
+    {{- if $start.Tag }}
+    image: {{ $start.Image }}:{{ $start.Tag }}
+    {{- else }}
+    build: {{ $.Cwd}}/{{ $.AppRoot }}/{{ $start.Build }}
+    {{- end }}
+
+    {{- if or $start.Mongo.Use $start.Postgresql.Use $start.S3.Use }}
+    depends_on:
+    {{ if $start.Mongo.Use }} - __db-mongo {{ end }}
+    {{ if $start.Postgresql.Use }} - __db-postgresql {{ end }}
+    {{ if $start.S3.Use }} - __db-minio {{ end }}
+    {{- end }}
+
+    restart: on-failure
+    environment:
+      EXT_ROUTE_MAP: '{{ $.UrlMapJson }}'
+      NODE_ENV: "development"
+
+      {{- range $start.Secrets }}
+      {{ .Var }}: # {{ .Description }}
+      {{- end }}
+
+    {{- with $start.Mongo.Use }}
+      MONGO_CONNECTION_STRING: "mongodb://__db-mongo/{{$start.Mongo.Db}}"
+    {{- end }}
+
+    {{- if $start.Postgresql.Use }}
+      PGUSERNAME: "{{$k}}"
+      PGUSER: "{{$k}}"
+      PGPASSWORD: "{{$k}}"
+      PGPORT: 5432
+      PGDATABASE: "{{$start.Postgresql.Db}}"
+      PGHOST: __db-postgresql
+    {{- end }}
+
+    {{- if $start.S3.Use }}
+      S3_ACCESS_KEY: "s3-bucket-access-user"
+      S3_SECRET_KEY: "s3-bucket-access-password"
+      S3_ENDPOINT: "__db-minio"
+      S3_BUCKET: "{{.Db}}"
+    {{- end }}
+
+    {{- if $.Expose.Enabled }}
+    extra_hosts:
+    - "{{$.Expose.App}}:172.17.0.1"
+    {{- end }}
+
+    networks:
+    - app_net  
+{{ end }}
+
+{{- if .Spec.Postgresql.Enabled }}
+  __db-postgresql:
+    image: bitnami/postgresql:14.2.0-debian-10-r70
+    restart: on-failure
+    environment:
+      POSTGRESQL_PASSWORD: pg_local_pass
+    ports:
+    - "5432:5432"
+    networks:
+    - app_net
+
+  {{ range .Spec.Postgresql.Dbs }}
+  __db-postgresql-db-{{.Name}}:
+    image: bitnami/postgresql:14.2.0-debian-10-r70
+    restart: "no"
+    depends_on: ["__db-postgresql"]
+    environment:
+      PGUSERNAME: postgresql
+      PGPASSWORD: pg_local_pass
+      PGHOST: __db-postgresql
+    command: "psql -c 'CREATE DATABASE {{.Name}};'"
+    networks:
+    - app_net
+  {{- end }}
+
+  
+  {{ range $k, $app := .Spec.Apps }}
+  {{ if $app.Postgresql.Use }}
+  __db-postgresql-dbuser-{{$k}}:
+    image: bitnami/postgresql:14.2.0-debian-10-r70
+    restart: "no"
+    depends_on: ["__db-postgresql-db-{{$app.Postgresql.Db}}"]
+    command: "psql -c \"CREATE USER \\\"{{$k}}\\\" WITH LOGIN PASSWORD '{{$k}}'; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \\\"{{$k}}\\\" ;\""
+    environment:
+      PGUSERNAME: postgresql
+      PGPASSWORD: pg_local_pass
+      PGHOST: __db-postgresql
+    networks:
+    - app_net
+  {{ end }}
+  {{ end }}
+
+{{- end }}
+
+{{ if .Spec.Mongo.Enabled }}
+  __db-mongo:
+    image: bitnami/mongodb:4.4.13-debian-10-r52
+    #image: mongo:latest
+    restart: on-failure
+    ports:
+    - "27017:27017"
+    networks:
+    - app_net
+
+  __db-mongo-express:
+    image: mongo-express:latest
+    restart: always
+    depends_on:
+    - __db-mongo
+    environment:
+      ME_CONFIG_MONGODB_URL: "mongodb://__db-mongo:27017/"
+    networks:
+    - app_net
+{{- end }}
+
+{{- if .Spec.S3.Enabled }}
+  __db-minio:
+    #image: bitnami/minio:latest
+    image: bitnami/minio:2022.4.26
+    restart: always
+    ports:
+    - "9000:9000"
+    - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: s3-bucket-access-user
+      MINIO_ROOT_PASSWORD: s3-bucket-access-password
+    networks:
+    - app_net
+
+  {{ range .Spec.S3.Dbs }}
+  __db-minio-bucket-{{.Name}}:
+    #image: bitnami/minio-client:latest
+    image: bitnami/minio-client:2022.4.26
+    restart: "no"
+    depends_on: ["__db-minio"]
+    command: "mb minio/{{.Name}}"
+    environment:
+      MINIO_SERVER_HOST: "172.17.0.1"
+      MINIO_SERVER_ACCESS_KEY: s3-bucket-access-user
+      MINIO_SERVER_SECRET_KEY: s3-bucket-access-password
+    networks:
+    - app_net
+  {{- end }}
+
+{{- end }}
+
+secrets:
+  router_config:
+    file: {{ .NginxConfig }}
+
+networks:
+  app_net:
+    driver: bridge

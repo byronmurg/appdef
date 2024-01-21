@@ -1,0 +1,15 @@
+
+.copy-box {
+	position: absolute;
+	display: none;
+	right: 1rem;
+	top: 1rem;
+}
+
+.copy-box-parent {
+	position: relative;
+}
+
+.copy-box-parent:hover .copy-box {
+	display: block;
+}

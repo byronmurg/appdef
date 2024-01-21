@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This is a dirty hack so that devs don't need coreutils
+realpath() {
+    [[ $1 =~ /.* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+
+realdir() {
+	path=$(realpath "$1")
+	echo "${path%/*}"
+}
+
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+getos() {
+	if [[ $OSTYPE =~ darwin.* ]]; then
+		echo "darwin"
+	elif [[ $OSTYPE =~ linux.* ]]; then
+		echo "linux"
+	elif [[ $OSTYPE == "freebsd" ]]; then
+		echo "freebsd"
+	else
+		die "I can't work out this operating system $OSTYPE"
+	fi
+}
+
+TARGET=appdef-tool
+GO_IMG_VERSION="1.18.3-bullseye"
+THISDIR=$(realdir "${BASH_SOURCE[0]}")
+os=$(getos)
+
+echo "os=${os} thisdir=${THISDIR} img_version=${GO_IMG_VERSION} target=${TARGET}"
+
+docker run --rm -it --name rst-build --mount "type=bind,source=${THISDIR},target=/opt/" --workdir "/opt" -e "GOOS=${os}" golang:${GO_IMG_VERSION} go build -o $TARGET main.go
+
+echo "Enter your sudo password:"
+sudo cp -i $THISDIR/$TARGET /usr/local/bin/$TARGET
+
+echo "installed $TARGET $($TARGET version)"
