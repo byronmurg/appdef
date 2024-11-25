@@ -48,7 +48,7 @@ function App() {
 							</NavDropdown>
 						</Col>
 						<Col>
-							<Nav.Link href="https://github.com/appdef.io/appdef/tree/main/tool" >cli</Nav.Link>
+							<Nav.Link href="https://github.com/byronmurg/appdef/releases/" >cli</Nav.Link>
 						</Col>
 						<Col >
 							<Nav.Link as={Link} to="/" >spec</Nav.Link>

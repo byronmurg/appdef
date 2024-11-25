@@ -1,19 +1,19 @@
 ## Api builder
-FROM golang:1.18.3-alpine3.16 AS builder
+FROM golang:1.22.9-alpine3.20 AS builder
 
 COPY api/ /opt
 WORKDIR /opt
 RUN go build -o appdef-service-api main.go
 
 ## Ui builder
-FROM node:17.9.0-alpine3.15 AS ui-builder
+FROM node:23-alpine3.19 AS ui-builder
 
 COPY ui/ /opt
 WORKDIR /opt
 RUN npm ci && npm run build
 
 ## Main image
-FROM alpine:3.16.0
+FROM alpine:3.20.2
 RUN mkdir /srv/ui
 COPY --from=builder /opt/appdef-service-api /usr/local/bin/appdef-service
 COPY --from=ui-builder /opt/build /srv/ui/build
