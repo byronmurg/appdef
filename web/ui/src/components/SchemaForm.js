@@ -411,7 +411,7 @@ export default function SchemaForm({ onSubmit, onChange, value, ...rest }) {
 	}
 
 	return (
-		<Form onSubmit={onSubmit} noValidate >
+		<Form onSubmit={onSubmit} >
 			<Form.Control type="submit" value="render" />
 			<FormSection title="Name">
 				<TextField

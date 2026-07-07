@@ -27,8 +27,8 @@ function App() {
 	return (
 		<Router>
 		<div className="fullscreen">
-			<Navbar bg="primary" expand="lg" className="header-bar" >
-				<Container fluid>
+			<Navbar bg="primary" variant="dark" expand="lg" className="header-bar" >
+				<Container fluid >
 					<Col sm="auto" >
 					<Navbar.Brand>
 						<Link to="/" >
